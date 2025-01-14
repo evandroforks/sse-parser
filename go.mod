@@ -1,3 +1,3 @@
-module github.com/GiGurra/sse-parser
+module github.com/evandroforks/sse-parser
 
-go 1.22.4
+go 1.22.4.1
