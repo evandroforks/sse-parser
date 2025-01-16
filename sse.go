@@ -105,7 +105,8 @@ func (p *Parser) doParseAll(isFinish bool) []Message {
 		}
 		return true
 	}
-	if stringsAllEmpty(parts) {
+
+	if !isFinish && stringsAllEmpty(parts) {
 		return []Message{}
 	}
 
@@ -120,13 +121,14 @@ func (p *Parser) doParseAll(isFinish bool) []Message {
 			continue
 		}
 
-		message, ok := p.doParseSingle(part)
-		if !ok {
-			slog.Error(fmt.Sprintf("Invalid message: %s, skipping", part))
-			continue
+		if strings.TrimSpace(part) != "" {
+			message, ok := p.doParseSingle(part)
+			if !ok {
+				slog.Error(fmt.Sprintf("Invalid message: %s, skipping", part))
+				continue
+			}
+			messages = append(messages, message)
 		}
-
-		messages = append(messages, message)
 	}
 
 	lastPart := parts[len(parts)-1]
