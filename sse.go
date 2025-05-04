@@ -29,8 +29,42 @@ func (p *Parser) Reset() {
 
 func (p *Parser) doParseSingle(all string) (Message, bool) {
 	lineInPart := strings.Split(all, "\n")
-	if len(lineInPart) < 2 {
+
+	if len(lineInPart) < 1 {
+		slog.Error(fmt.Sprintf("Missing any data or event in: %v", lineInPart))
 		return Message{}, false
+	}
+	if len(lineInPart) == 1 {
+		line := lineInPart[0]
+
+		if strings.HasPrefix(line, "event:") {
+			event := strings.TrimPrefix(line, "event:")
+
+			if p.dataCompleteFn == nil || p.dataCompleteFn("") {
+				return Message{
+					Event: event,
+					Data:  "",
+				}, true
+			} else {
+				slog.Error(fmt.Sprintf("Missing event dataCompleteFn: %v", line))
+				return Message{}, false
+			}
+		} else if strings.HasPrefix(line, "data:") {
+			data := strings.TrimPrefix(line, "data:")
+
+			if p.dataCompleteFn == nil || p.dataCompleteFn(data) {
+				return Message{
+					Event: "",
+					Data:  data,
+				}, true
+			} else {
+				slog.Error(fmt.Sprintf("Missing data dataCompleteFn: %v", line))
+				return Message{}, false
+			}
+		} else {
+			slog.Error(fmt.Sprintf("Missing data or event in one line stream: %v", line))
+			return Message{}, false
+		}
 	}
 	eventLine := lineInPart[0]
 	dataLines := strings.Join(lineInPart[1:], "\n")
@@ -51,6 +85,7 @@ func (p *Parser) doParseSingle(all string) (Message, bool) {
 			Data:  data,
 		}, true
 	} else {
+		slog.Error(fmt.Sprintf("Missing data or event in: %v", eventLine))
 		return Message{}, false
 	}
 }
@@ -70,7 +105,8 @@ func (p *Parser) doParseAll(isFinish bool) []Message {
 		}
 		return true
 	}
-	if stringsAllEmpty(parts) {
+
+	if !isFinish && stringsAllEmpty(parts) {
 		return []Message{}
 	}
 
@@ -85,13 +121,14 @@ func (p *Parser) doParseAll(isFinish bool) []Message {
 			continue
 		}
 
-		message, ok := p.doParseSingle(part)
-		if !ok {
-			slog.Error(fmt.Sprintf("Invalid message: %s, skipping", part))
-			continue
+		if strings.TrimSpace(part) != "" {
+			message, ok := p.doParseSingle(part)
+			if !ok {
+				slog.Error(fmt.Sprintf("Invalid message: %s, skipping", part))
+				continue
+			}
+			messages = append(messages, message)
 		}
-
-		messages = append(messages, message)
 	}
 
 	lastPart := parts[len(parts)-1]
